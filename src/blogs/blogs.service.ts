@@ -67,6 +67,11 @@ export class BlogsService {
     } else {
       tagsArray = tags.map(tag => tag.trim());
     }
+   }
+    const cacheKey = `blogs:${page}:${limit}:${tagsArray.join(',')}`;
+  const cached = await this.cacheManager.get<{ data: Blog[]; total: number }>(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   const query = this.blogsRepository

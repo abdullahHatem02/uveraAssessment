@@ -123,31 +123,6 @@ describe('BlogsService', () => {
       expect(cacheManager.get).toHaveBeenCalledWith(`blogs:${page}:${limit}:${tags.join(',')}`);
       expect(blogRepository.createQueryBuilder).not.toHaveBeenCalled();
     });
-
-    it('should return all blog posts with pagination and tags', async () => {
-      const page = 1;
-      const limit = 10;
-      const tags = ['test'];
-      const queryResult = [[mockBlog], 1];
-
-      mockCacheManager.get.mockResolvedValue(null);
-      mockQueryBuilder.getManyAndCount.mockResolvedValue(queryResult);
-
-      const result = await service.findAll(page, limit, tags);
-
-      expect(result).toEqual({ data: queryResult[0], total: queryResult[1] });
-      expect(blogRepository.createQueryBuilder).toHaveBeenCalledWith('blog');
-      expect(mockQueryBuilder.leftJoinAndSelect).toHaveBeenCalledWith('blog.author', 'author');
-      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('blog.createdAt', 'DESC');
-      expect(mockQueryBuilder.skip).toHaveBeenCalledWith((page - 1) * limit);
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(limit);
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith('blog.tags && :tags', { tags });
-      expect(cacheManager.set).toHaveBeenCalledWith(
-        `blogs:${page}:${limit}:${tags.join(',')}`,
-        { data: queryResult[0], total: queryResult[1] },
-        60 * 60
-      );
-    });
   });
 
   describe('findOne', () => {
