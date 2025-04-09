@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject } from '@nestjs/common';
@@ -56,33 +56,48 @@ export class BlogsService {
     
   }
 
-  async findAll(page = 1, limit = 10, tags?: string[]): Promise<{ data: Blog[]; total: number }> {
-  
-      const cacheKey = `blogs:${page}:${limit}:${tags?.join(',') || 'all'}`;
-      const cached = await this.cacheManager.get<{ data: Blog[]; total: number }>(cacheKey);
+ async findAll(page = 1, limit = 10, tags?: string | string[]): Promise<{ data: Blog[]; total: number }> {
+  page = Number(page) || 1;
+  limit = Number(limit) || 10;
 
-      if (cached) {
-        return cached;
-      }
-
-      const query = this.blogsRepository
-        .createQueryBuilder('blog')
-        .leftJoinAndSelect('blog.author', 'author')
-        .orderBy('blog.createdAt', 'DESC')
-        .skip((page - 1) * limit)
-        .take(limit);
-
-      if (tags && tags.length > 0) {
-        query.where('blog.tags && :tags', { tags });
-      }
-
-      const [data, total] = await query.getManyAndCount();
-      const result = { data, total };
-
-      await this.cacheManager.set(cacheKey, result, 60 * 60); // 
-      return result;
-   
+  let tagsArray: string[] = [];
+  if (tags) {
+    if (typeof tags === 'string') {
+      tagsArray = tags.split(',').map(tag => tag.trim());
+    } else {
+      tagsArray = tags.map(tag => tag.trim());
+    }
   }
+
+  const query = this.blogsRepository
+    .createQueryBuilder('blog')
+    .leftJoinAndSelect('blog.author', 'author')
+    .orderBy('blog.createdAt', 'DESC');
+
+  if (tagsArray.length > 0) {
+    query.andWhere(
+      tagsArray.map((_, index) => `blog.tags LIKE :tag${index}`).join(' OR '),
+      tagsArray.reduce((params, tag, index) => {
+        params[`tag${index}`] = `%${tag}%`;
+        return params;
+      }, {})
+    );
+  }
+
+  query.skip((page - 1) * limit).take(limit);
+
+  const [data, total] = await query.getManyAndCount();
+  const result = { data, total };
+
+  await this.cacheManager.set(
+    `blogs:${page}:${limit}:${tagsArray.join(',')}`, 
+    result, 
+    60 * 60
+  );
+  
+  return result;
+}
+
 
   
   async findOne(id: string): Promise<Blog> {

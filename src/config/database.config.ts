@@ -9,5 +9,5 @@ export default registerAs('database', () => ({
   extra: {
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   },
-  logging: process.env.NODE_ENV === 'development',
+  logging: false,
 })); 
